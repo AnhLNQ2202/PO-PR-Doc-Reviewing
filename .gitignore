@@ -1,0 +1,27 @@
+# Chìa khóa thật không được vào Git.
+.env
+.env.*
+!.env.example
+
+# Python và test cache.
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# File tạm và log.
+tmp/
+work/
+*.tmp
+*.log
+
+# Rác của hệ điều hành/editor.
+.DS_Store
+Thumbs.db
+*.swp
