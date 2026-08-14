@@ -1,4 +1,4 @@
-# PO/PR Reviewing — bản thi hackathon
+# PO/PR Reviewing
 
 Đây là cách đưa công cụ lên một GreenNode vServer bằng Docker.
 
