@@ -1,0 +1,50 @@
+FROM python:3.12-slim-bookworm AS builder
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    VIRTUAL_ENV=/opt/venv
+
+RUN python -m venv "$VIRTUAL_ENV"
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+WORKDIR /build
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir --requirement requirements.txt
+
+
+FROM python:3.12-slim-bookworm AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    TEMP_DIR=/work/tmp \
+    TMPDIR=/work/tmp \
+    TMP=/work/tmp \
+    TEMP=/work/tmp
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        ca-certificates \
+        libmagic1 \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-vie \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app \
+    && mkdir -p /app/backend /work/tmp \
+    && chown -R app:app /app /work
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=app:app backend/ /app/backend/
+
+WORKDIR /app/backend
+USER 10001:10001
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/live', timeout=3).read()"]
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--no-access-log"]

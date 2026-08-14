@@ -1,0 +1,101 @@
+name: po-pr-reviewing-hackathon
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      MAAS_BASE_URL: "${MAAS_BASE_URL:?Hãy điền endpoint MaaS do GreenNode cấp trong file .env}"
+      ALLOW_INSECURE_MAAS_HTTP: ${ALLOW_INSECURE_MAAS_HTTP:-false}
+      MAAS_API_KEY: "${MAAS_API_KEY:?Hãy điền MAAS_API_KEY trong file .env}"
+      MAAS_MODEL: ${MAAS_MODEL:-GreenNode/GreenMind-Medium-14B-R1}
+      MAAS_TIMEOUT_SECONDS: ${MAAS_TIMEOUT_SECONDS:-240}
+      MAAS_MAX_OUTPUT_TOKENS: ${MAAS_MAX_OUTPUT_TOKENS:-8000}
+      MAAS_CHUNK_CHARS: ${MAAS_CHUNK_CHARS:-16000}
+      MAAS_MERGE_CHARS: ${MAAS_MERGE_CHARS:-60000}
+      MAAS_JSON_MODE: ${MAAS_JSON_MODE:-none}
+      OCR_LANG: ${OCR_LANG:-vie+eng}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TEMP_DIR: /work/tmp
+      TMPDIR: /work/tmp
+      TMP: /work/tmp
+      TEMP: /work/tmp
+      APP_VERSION: ${APP_VERSION:-dev}
+    expose:
+      - "8080"
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    volumes:
+      - po_pr_temp:/work/tmp
+    networks:
+      - private
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/live', timeout=3).read()"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    stop_grace_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${APP_HTTP_PORT:-8080}:8080"
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    networks:
+      - private
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  private:
+    driver: bridge
+
+volumes:
+  po_pr_temp:
+    driver: local
